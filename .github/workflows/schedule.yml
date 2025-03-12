@@ -1,0 +1,13 @@
+name: Scheduled Job
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Runs every day at midnight UTC
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  run-cronjob:
+    runs-on: custom-runner-devops
+    steps:
+      - name: Run a script
+        run: echo "This is a scheduled job running at $(date)"
