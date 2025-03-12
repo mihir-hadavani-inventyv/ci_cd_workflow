@@ -1,8 +1,9 @@
 name: Scheduled Job
 
 on:
-  schedule:
-    - cron: '* * * * *'  # Runs every day at midnight UTC
+  push:  # Runs on every push event
+  issues:
+    types: [opened]   # Runs every day at midnight UTC
   workflow_dispatch:  # Allows manual trigger
 
 jobs:
