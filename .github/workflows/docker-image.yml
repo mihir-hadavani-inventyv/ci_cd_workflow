@@ -53,7 +53,7 @@ jobs:
           docker image rm cicd-test || echo "No image to remove"
           docker rm cicd-test || echo "No container to remove"
           docker build -t cicd-test -f Dockerfile.test .
-          docker container run --name cicd-test cicd-test -e MONGO_CONN_STRING=${{env.MONGO_CONN_STRING}} -e MONGO_COLLECTION_NAME=${{env.MONGO_COLLECTION_NAME}} -e MONGO_DB_NAME=${{env.MONGO_DB_NAME}} -e PORT=${{env.PORT}}
+          docker container run --name cicd-test  -e MONGO_CONN_STRING="${{env.MONGO_CONN_STRING}}" -e MONGO_COLLECTION_NAME="${{env.MONGO_COLLECTION_NAME}}" -e MONGO_DB_NAME="${{env.MONGO_DB_NAME}}" -e PORT="${{env.PORT}}" cicd-test
           docker wait cicd-test
           if [ $? -eq 0 ]; then
             echo "Test Passed"
