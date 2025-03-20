@@ -1,0 +1,99 @@
+name: Docker Image CI
+
+on:
+  # push:
+  #   branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Enter version number (e.g., 1.0.0)"
+        required: false
+env:
+  MONGO_CONN_STRING: ${{secrets.MONGO_CONN_STRING}}
+  MONGO_DB_NAME: ${{secrets.MONGO_DB_NAME}}
+  MONGO_COLLECTION_NAME: ${{secrets.MONGO_COLLECTION_NAME}}
+  PORT: ${{secrets.PORT}}
+  DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
+  DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
+  HARBOR_REGISTRY: ${{secrets.HARBOR_REGISTRY}}
+  PUB_SUB_PUBLISHER: ${{secrets.PUB_SUB_PUBLISHER}}
+  PUBSUB_TOPIC: ${{secrets.PUBSUB_TOPIC}}
+  GCP_PROJECT_ID: ${{secrets.GCP_PROJECT_ID}}        
+  
+jobs:
+  build:
+    runs-on: self-hosted`
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version
+        id: determine_version
+        run: |
+          if [ "${{ github.event.inputs.version }}" ]; then
+            VERSION=${{ github.event.inputs.version }}
+            echo "Using input version: $VERSION"
+          else
+            VERSION=$(grep '^VERSION=' config.env | cut -d '=' -f2)
+            echo "Using version from .env: $VERSION"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+
+      - name: Check if Version Already Exists
+        run: |
+          if command docker pull ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:v${{ env.VERSION }} ; then
+            echo "Error: Image version v${{ env.VERSION }} already exists in the registry."
+            exit 1
+          fi
+
+      - name: Test Docker Image Generated
+        run: |
+          docker image rm cicd-test || echo "No image to remove"
+          docker rm cicd-test || echo "No container to remove"
+          docker build -t cicd-test -f Dockerfile.test .
+          docker container run --name cicd-test cicd-test -e MONGO_CONN_STRING=${{env.MONGO_CONN_STRING}} -e MONGO_COLLECTION_NAME=${{env.MONGO_COLLECTION_NAME}} -e MONGO_DB_NAME=${{env.MONGO_DB_NAME}} -e PORT=${{env.PORT}}
+          docker wait cicd-test
+          if [ $? -eq 0 ]; then
+            echo "Test Passed"
+          else
+            echo "Test Failed"
+            exit 1
+          fi
+
+      - name: Log in to Docker Registry
+        run: echo "${{ env.DOCKER_PASSWORD }}" | docker login ${{env.HARBOR_REGISTRY}}  -u "${{ env.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Pull Old Image (if exists)
+        continue-on-error: true
+        run: docker pull ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest || echo "No existing image found"
+
+      - name: Remove Old Image (if exists)
+        continue-on-error: true
+        run: docker rmi ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest || echo "No old image to remove"
+
+      - name: Build the Docker Image
+        run: |
+          docker build -t ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest .
+          docker tag ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:v${{ env.VERSION }}
+
+      - name: Push Docker Image
+        run: |
+          docker push ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest
+          docker push ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:v${{ env.VERSION }}
+      - name: cleanup
+        run: |
+          docker image rm -f ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:latest
+          docker image rm -f ${{env.HARBOR_REGISTRY}}/inventyv/todo-python:v${{ env.VERSION }}
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ env.PUB_SUB_PUBLISHER }}
+
+      - name: Publish a message to Google Cloud Pub/Sub
+        uses: miraliumre/actions-pubsub@v1
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          topic_name: ${{ env.PUBSUB_TOPIC }}
+          message: '{"type":"production", "version": "${{ env.VERSION }}"}'
