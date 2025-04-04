@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: production
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: example
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: example
+    spec:
+      containers:
+        - image: 'mihir.harbor.com/inventyv/todo-python'
+          imagePullPolicy: Always
+          name: poding
+          envFrom:
+            - secretRef:
+                name: project-env
