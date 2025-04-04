@@ -3,6 +3,7 @@ from bson import ObjectId    #  For ObjectId to work
 from pymongo import MongoClient
 import dotenv
 from dotenv import load_dotenv
+from prometheus_flask_exporter import PrometheusMetrics
 import os
 load_dotenv()
 
@@ -17,7 +18,7 @@ MONGO_CONN_NAME = os.getenv( "MONGO_COLLECTION_NAME")
 
 app = Flask(__name__)
 port = os.getenv("PORT")
-
+metrics = PrometheusMetrics(app)
 
 title = "Task Management application with Flask and MongoDB"
 heading = "Task Management"
@@ -166,6 +167,6 @@ def search():
 
 if __name__  ==  '__main__':
     if port is None:
-        app.run(host = '0.0.0.0', port = 5000, debug = True)
+        app.run(host = '0.0.0.0', port = 5000)
     else:
-        app.run(host = '0.0.0.0', port = int(port), debug = True)
+        app.run(host = '0.0.0.0', port = int(port))

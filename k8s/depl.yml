@@ -19,7 +19,7 @@ spec:
         app: example
     spec:
       containers:
-        - image: 'mihir.harbor.com/inventyv/todo-python'
+        - image: 'mihir.harbor.com/inventyv/todo-python:v1.0.8'
           imagePullPolicy: Always
           name: poding
           envFrom:
